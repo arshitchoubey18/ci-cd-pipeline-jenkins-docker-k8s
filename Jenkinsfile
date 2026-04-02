@@ -22,17 +22,15 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t $DOCKER_IMAGE:$TAG .'
+                sh 'docker build --no-cache -t $DOCKER_IMAGE:$TAG .'
             }
         }
 
         stage('Push Docker Image') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh '''
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker push $DOCKER_IMAGE:$TAG
-                    '''
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                    sh 'docker push $DOCKER_IMAGE:$TAG'
                 }
             }
         }
@@ -40,10 +38,10 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
-                    cp k8s/deployment.yaml k8s/deployment-final.yaml
-                    sed -i "s|IMAGE_TAG|$TAG|g" k8s/deployment-final.yaml
-                    kubectl apply -f k8s/deployment-final.yaml
-                    kubectl apply -f k8s/service.yaml
+                cp k8s/deployment.yaml k8s/deployment-final.yaml
+                sed -i "s|IMAGE_TAG|$TAG|g" k8s/deployment-final.yaml
+                kubectl apply -f k8s/deployment-final.yaml
+                kubectl apply -f k8s/service.yaml
                 '''
             }
         }
@@ -51,18 +49,18 @@ pipeline {
         stage('Verify Deployment') {
             steps {
                 sh 'kubectl rollout status deployment/nodejs-app'
-                sh 'kubectl get pods'
-                sh 'kubectl get svc'
+                sh 'kubectl get deployment nodejs-app -o=jsonpath="{.spec.template.spec.containers[0].image}"'
+                sh 'echo'
             }
         }
     }
 
     post {
         success {
-            echo 'Pipeline executed successfully!'
+            echo 'Pipeline executed successfully'
         }
         failure {
-            echo 'Pipeline failed. Check logs.'
+            echo 'Pipeline failed'
         }
     }
 }
