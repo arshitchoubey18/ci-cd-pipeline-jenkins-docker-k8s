@@ -27,23 +27,23 @@ pipeline {
         }
 
         stage('Push Docker Image') {
-    steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-            sh '''
-                echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                docker push arshitchoubey18/nodejs-app:2
-            '''
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push $DOCKER_IMAGE:$TAG
+                    '''
+                }
+            }
         }
-    }
-}
 
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
-                cp k8s/deployment.yaml k8s/deployment-final.yaml
-                sed -i "s|IMAGE_TAG|$TAG|g" k8s/deployment-final.yaml
-                kubectl apply -f k8s/deployment-final.yaml
-                kubectl apply -f k8s/service.yaml
+                    cp k8s/deployment.yaml k8s/deployment-final.yaml
+                    sed -i "s|IMAGE_TAG|$TAG|g" k8s/deployment-final.yaml
+                    kubectl apply -f k8s/deployment-final.yaml
+                    kubectl apply -f k8s/service.yaml
                 '''
             }
         }
