@@ -6,7 +6,7 @@ const PORT = 3000;
 app.use(express.json());
 
 app.get('/', (req, res) => {
-  res.send('CI/CD Pipeline App is running 🚀');
+  res.send('CI/CD Pipeline App version 2 is running 🚀');
 });
 
 app.get('/health', (req, res) => {
