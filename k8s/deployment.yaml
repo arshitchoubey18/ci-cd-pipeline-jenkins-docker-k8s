@@ -2,13 +2,16 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nodejs-app
+  namespace: default
+  labels:
+    app: nodejs-app
 spec:
   replicas: 3
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 1
-      maxSurge: 1
+      maxUnavailable: 25%
+      maxSurge: 25%
   selector:
     matchLabels:
       app: nodejs-app
@@ -19,10 +22,17 @@ spec:
     spec:
       containers:
       - name: nodejs-app
-                image: arshitchoubey18/nodejs-app:${IMAGE_TAG}
+        image: arshitchoubey18/nodejs-app:${IMAGE_TAG}
         imagePullPolicy: Always
         ports:
         - containerPort: 3000
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
         readinessProbe:
           httpGet:
             path: /health
