@@ -5,6 +5,7 @@ metadata:
   namespace: default
   labels:
     app: nodejs-app
+    tier: frontend
 spec:
   selector:
     app: nodejs-app

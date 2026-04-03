@@ -10,8 +10,8 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 25%
-      maxSurge: 25%
+      maxUnavailable: 25%      # Allows 25% pods to be unavailable during update
+      maxSurge: 25%            # Allows 25% extra pods during rollout (smoother updates)
   selector:
     matchLabels:
       app: nodejs-app
