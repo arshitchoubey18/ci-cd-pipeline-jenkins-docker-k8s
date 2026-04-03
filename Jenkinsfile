@@ -37,16 +37,22 @@ pipeline {
             }
         }
 
-        stage('Trivy Security Scan') {
+                stage('Trivy Security Scan') {
             steps {
-                sh '''
-                docker run --rm aquasec/trivy image \
-                  --exit-code 1 \
-                  --no-progress \
-                  --severity HIGH,CRITICAL \
-                  $DOCKER_IMAGE:$TAG
-                '''
-                echo '✅ Security scan passed'
+                script {
+                    echo '🔍 Running Trivy Security Scan...'
+                    // Use stable version instead of :latest + mount Docker socket
+                    sh '''
+                    docker run --rm \
+                      -v /var/run/docker.sock:/var/run/docker.sock \
+                      aquasec/trivy:0.69.3 image \
+                        --exit-code 1 \
+                        --no-progress \
+                        --severity HIGH,CRITICAL \
+                        ${DOCKER_IMAGE}:${TAG}
+                    '''
+                    echo '✅ Trivy Security Scan passed - No HIGH/CRITICAL vulnerabilities found'
+                }
             }
         }
 
