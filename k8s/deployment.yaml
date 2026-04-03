@@ -18,16 +18,24 @@ spec:
         app: nodejs-app
     spec:
       containers:
-        - name: nodejs-app
-          image: arshitchoubey18/nodejs-app:IMAGE_TAG
-          imagePullPolicy: Always
-          ports:
-            - containerPort: 3000
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 3000
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 2
-            failureThreshold: 3
+      - name: nodejs-app
+        image: arshitchoubey18/nodejs-app:IMAGE_TAG
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 2
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 2
+          failureThreshold: 3

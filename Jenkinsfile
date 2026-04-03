@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    triggers {
+        githubPush()   // ← Webhook trigger
+    }
+
     environment {
         DOCKER_IMAGE = "arshitchoubey18/nodejs-app"
         TAG = "${BUILD_NUMBER}"
@@ -20,9 +24,29 @@ pipeline {
             }
         }
 
+        stage('Install Dependencies & Run Tests') {
+            steps {
+                sh 'npm ci'
+                sh 'npm test'
+            }
+        }
+
         stage('Build Docker Image') {
             steps {
                 sh 'docker build --no-cache -t $DOCKER_IMAGE:$TAG .'
+            }
+        }
+
+        stage('Trivy Security Scan') {
+            steps {
+                sh '''
+                docker run --rm aquasec/trivy image \
+                  --exit-code 1 \
+                  --no-progress \
+                  --severity HIGH,CRITICAL \
+                  $DOCKER_IMAGE:$TAG
+                '''
+                echo '✅ Security scan passed'
             }
         }
 
@@ -48,19 +72,19 @@ pipeline {
 
         stage('Verify Deployment') {
             steps {
-                sh 'kubectl rollout status deployment/nodejs-app'
+                sh 'kubectl rollout status deployment/nodejs-app --timeout=60s'
                 sh 'kubectl get deployment nodejs-app -o=jsonpath="{.spec.template.spec.containers[0].image}"'
-                sh 'echo'
+                echo '✅ Deployment verified successfully'
             }
         }
     }
 
     post {
         success {
-            echo 'Pipeline executed successfully'
+            echo '🎉 Pipeline executed successfully!'
         }
         failure {
-            echo 'Pipeline failed'
+            echo '❌ Pipeline failed'
         }
     }
 }
