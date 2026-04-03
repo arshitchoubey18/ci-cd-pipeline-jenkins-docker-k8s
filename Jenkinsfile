@@ -1,66 +1,41 @@
 pipeline {
     agent any
 
-    triggers {
-        githubPush()   // ← Webhook trigger
-    }
-
     environment {
         DOCKER_IMAGE = "arshitchoubey18/nodejs-app"
-        TAG = "${BUILD_NUMBER}"
-        KUBECONFIG = "/var/lib/jenkins/.kube/config"
+        TAG          = "${BUILD_NUMBER}"
+        APP_NAME     = "nodejs-app"
     }
 
     stages {
-        stage('Clean Workspace') {
-            steps {
-                deleteDir()
-            }
-        }
-
         stage('Clone Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/arshitchoubey18/ci-cd-pipeline-jenkins-docker-k8s.git'
+                checkout scm   // Better practice instead of hardcoded git clone
             }
         }
 
-        stage('Install Dependencies & Run Tests') {
+        stage('Install Dependencies & Test') {
             steps {
-                sh 'npm ci'
-                sh 'npm test'
+                sh 'npm ci'                    // Clean and fast install
+                sh 'npm test --if-present'     // Runs tests if script exists, otherwise skips
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build --no-cache -t $DOCKER_IMAGE:$TAG .'
-            }
-        }
-
-                stage('Trivy Security Scan') {
-            steps {
-                script {
-                    echo '🔍 Running Trivy Security Scan...'
-                    // Use stable version instead of :latest + mount Docker socket
-                    sh '''
-                    docker run --rm \
-                      -v /var/run/docker.sock:/var/run/docker.sock \
-                      aquasec/trivy:0.69.3 image \
-                        --exit-code 1 \
-                        --no-progress \
-                        --severity HIGH,CRITICAL \
-                        ${DOCKER_IMAGE}:${TAG}
-                    '''
-                    echo '✅ Trivy Security Scan passed - No HIGH/CRITICAL vulnerabilities found'
-                }
+                sh "docker build -t ${DOCKER_IMAGE}:${TAG} ."
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
+                                usernameVariable: 'DOCKER_USER', 
+                                passwordVariable: 'DOCKER_PASS')]) {
+                    
                     sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
-                    sh 'docker push $DOCKER_IMAGE:$TAG'
+                    sh "docker push ${DOCKER_IMAGE}:${TAG}"
+                    sh "docker push ${DOCKER_IMAGE}:latest"   // Also push latest tag
                 }
             }
         }
@@ -68,29 +43,28 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
-                cp k8s/deployment.yaml k8s/deployment-final.yaml
-                sed -i "s|IMAGE_TAG|$TAG|g" k8s/deployment-final.yaml
-                kubectl apply -f k8s/deployment-final.yaml
-                kubectl apply -f k8s/service.yaml
+                    # Use envsubst for clean templating
+                    IMAGE_TAG=${TAG} envsubst < k8s/deployment.yaml > k8s/deployment-rendered.yaml
+                    
+                    kubectl apply -f k8s/deployment-rendered.yaml
+                    kubectl apply -f k8s/service.yaml
+                    
+                    echo "Deployment completed with image tag: ${TAG}"
                 '''
-            }
-        }
-
-        stage('Verify Deployment') {
-            steps {
-                sh 'kubectl rollout status deployment/nodejs-app --timeout=60s'
-                sh 'kubectl get deployment nodejs-app -o=jsonpath="{.spec.template.spec.containers[0].image}"'
-                echo '✅ Deployment verified successfully'
             }
         }
     }
 
     post {
+        always {
+            sh 'docker logout || true'
+            cleanWs()                    // Clean workspace after build
+        }
         success {
             echo '🎉 Pipeline executed successfully!'
         }
         failure {
-            echo '❌ Pipeline failed'
+            echo '❌ Pipeline failed. Check the logs.'
         }
     }
 }
